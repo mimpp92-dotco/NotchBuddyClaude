@@ -25,8 +25,9 @@ fi
 echo "📂 Applications에 설치 중..."
 mv "$TMP_DIR/NotchBuddy.app" /Applications/
 
-# quarantine 속성 제거
+# quarantine 속성 제거 + 코드 재서명
 xattr -cr /Applications/NotchBuddy.app
+codesign --force --deep -s - /Applications/NotchBuddy.app 2>/dev/null
 
 # 정리
 rm -rf "$TMP_DIR"
