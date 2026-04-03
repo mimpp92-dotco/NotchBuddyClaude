@@ -56,7 +56,7 @@ enum MascotSet: String, CaseIterable, Sendable {
     func generateTexture(size: CGSize) -> SKTexture {
         // PNG 파일 기반 마스코트: Resources/{name}.png 로드
         if let name = imageName {
-            if let url = Bundle.module.url(forResource: name, withExtension: "png"),
+            if let url = ResourceBundle.bundle.url(forResource: name, withExtension: "png"),
                let image = NSImage(contentsOf: url) {
                 let tex = SKTexture(image: image)
                 tex.filteringMode = .nearest

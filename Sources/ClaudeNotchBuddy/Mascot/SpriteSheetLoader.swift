@@ -58,7 +58,7 @@ enum SpriteSheetLoader {
     // MARK: - Private
 
     private static func loadRowTexture(named name: String) -> SKTexture? {
-        guard let url = Bundle.module.url(forResource: name, withExtension: "png") else {
+        guard let url = ResourceBundle.bundle.url(forResource: name, withExtension: "png") else {
             print("[SpriteSheetLoader] \(name).png not found in bundle")
             return nil
         }
