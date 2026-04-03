@@ -15,17 +15,26 @@ Claude Code로 작업할 때, 노치 옆에 작은 마스코트가 나타나서 
 
 ## Installation
 
-1. [Releases](https://github.com/mimpp92-dotco/NotchBuddyClaude/releases)에서 최신 `NotchBuddy-v*.zip` 다운로드
-2. 압축 풀기
-3. `NotchBuddy.app`을 `/Applications` 폴더로 드래그
-4. 터미널에서 아래 명령어 실행 (최초 1회):
-   ```bash
-   xattr -cr /Applications/NotchBuddy.app
-   ```
-5. 앱 실행
+터미널에 아래 한 줄을 붙여넣으세요:
 
-> 서명되지 않은 앱이라 macOS가 "손상되었기 때문에 열 수 없습니다" 경고를 표시합니다.
-> 위 `xattr` 명령어로 quarantine 속성을 제거하면 정상 실행됩니다.
+```bash
+curl -sL https://raw.githubusercontent.com/mimpp92-dotco/NotchBuddyClaude/main/install.sh | bash
+```
+
+자동으로 다운로드 → 설치 → 실행됩니다.
+
+### 수동 설치
+
+1. [Releases](https://github.com/mimpp92-dotco/NotchBuddyClaude/releases)에서 `NotchBuddy-v*.zip` 다운로드
+2. 압축 풀고 `NotchBuddy.app`을 `/Applications`로 이동
+3. 터미널에서 `xattr -cr /Applications/NotchBuddy.app` 실행
+4. 앱 실행
+
+### 제거
+
+```bash
+rm -rf /Applications/NotchBuddy.app
+```
 
 ## Requirements
 
