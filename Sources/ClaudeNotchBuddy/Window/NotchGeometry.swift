@@ -6,8 +6,8 @@ struct NotchGeometry {
 
     /// 노치 왼쪽으로 확장하는 여유 공간 (마스코트 + 말풍선 영역)
     static let leftExtension: CGFloat = 200
-    /// 노치 오른쪽으로 확장하는 여유 공간 (물리적 노치에 맞춤)
-    static let rightExtension: CGFloat = 0
+    /// 노치 오른쪽으로 확장하는 여유 공간 (양쪽 자유 배치)
+    static let rightExtension: CGFloat = 200
 
     /// 둥근 모서리 반경
     static let cornerRadius: CGFloat = 16
@@ -78,6 +78,18 @@ struct NotchGeometry {
         )
     }
 
+    // MARK: - 노치 스냅 판정
+
+    /// 화면 좌표가 노치 Y 영역 안에 있는지 판정한다.
+    /// 스냅 존: 물리적 노치 + 아래 50pt 여유
+    static func isInNotchZone(screenPoint: NSPoint, screen: NSScreen = notchScreen()) -> Bool {
+        let info = getNotchInfo(screen: screen)
+        let notchTopY = info.screenFrame.maxY
+        let snapMargin: CGFloat = 50
+        let notchBottomY = notchTopY - info.notchHeight - snapMargin
+        return screenPoint.y >= notchBottomY && screenPoint.y <= notchTopY
+    }
+
     // MARK: - 윈도우 프레임 계산
 
     static func calculateFrame(
@@ -96,8 +108,9 @@ struct NotchGeometry {
             extraRight = rightExtension
             extraBottom = 0
         case .expanded:
-            extraLeft = leftExtension + 30
-            extraRight = rightExtension + 150
+            // 물리적 노치 기준 좌우 대칭 확장
+            extraLeft = 190
+            extraRight = 190
             extraBottom = 180
         }
 
@@ -111,6 +124,44 @@ struct NotchGeometry {
         let windowY = info.screenFrame.maxY - windowHeight
 
         return NSRect(x: windowLeft, y: windowY, width: windowWidth, height: windowHeight)
+    }
+
+    // MARK: - 데스크탑 Expanded 프레임
+
+    enum ExpandDirection {
+        case down, up
+    }
+
+    /// 데스크탑 모드에서 expanded 프레임을 계산한다.
+    /// 마스코트 중심 좌표 기준으로 방향을 자동 결정한다.
+    static func calculateDesktopExpandedFrame(
+        mascotCenter: NSPoint,
+        screen: NSScreen = notchScreen()
+    ) -> (frame: NSRect, direction: ExpandDirection) {
+        let expandedW: CGFloat = 380
+        let expandedH: CGFloat = 180
+        let mascotAreaH: CGFloat = 50  // 마스코트 높이 + 여유
+        let screenFrame = screen.visibleFrame
+
+        // 방향 결정: 아래 여유 확인
+        let spaceBelow = mascotCenter.y - screenFrame.minY
+        let direction: ExpandDirection = spaceBelow < (expandedH + 40) ? .up : .down
+
+        // X 위치: 마스코트 중앙 기준, 화면 경계 클램프
+        var x = mascotCenter.x - expandedW / 2
+        x = max(screenFrame.minX + 8, min(x, screenFrame.maxX - expandedW - 8))
+
+        // Y 위치: 방향에 따라
+        let y: CGFloat
+        switch direction {
+        case .down:
+            y = mascotCenter.y - mascotAreaH / 2 - expandedH
+        case .up:
+            y = mascotCenter.y + mascotAreaH / 2
+        }
+
+        let frame = NSRect(x: x, y: y, width: expandedW, height: expandedH + mascotAreaH)
+        return (frame, direction)
     }
 
     /// 윈도우 좌표계에서 노치의 좌/우 경계를 반환한다 (마스코트 배치용).

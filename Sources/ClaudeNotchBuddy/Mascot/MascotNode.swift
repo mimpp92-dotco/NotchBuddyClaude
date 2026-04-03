@@ -7,6 +7,9 @@ final class MascotNode: SKSpriteNode {
 
     private(set) var currentState: MascotState = .idle
 
+    /// 현재 MascotSize에 따른 기본 스케일 (StateAnimations에 전달)
+    var baseScale: CGFloat = 1.0
+
     private(set) var currentSet: MascotSet = .claude
 
     /// 스프라이트 시트 프레임 캐시 (spritecat 전용)
@@ -103,8 +106,8 @@ final class MascotNode: SKSpriteNode {
             run(tintAnim, withKey: "tintAnim")
         }
 
-        let transition = StateAnimations.transitionAction(to: state)
-        let stateAnim = StateAnimations.animation(for: state)
+        let transition = StateAnimations.transitionAction(to: state, baseScale: baseScale)
+        let stateAnim = StateAnimations.animation(for: state, baseScale: baseScale)
         run(SKAction.sequence([transition, stateAnim]), withKey: "stateAnim")
     }
 
@@ -132,8 +135,8 @@ final class MascotNode: SKSpriteNode {
         if let tintAnim = StateAnimations.tintAnimation(for: state) {
             run(tintAnim, withKey: "tintAnim")
         }
-        let transition = StateAnimations.transitionAction(to: state)
-        let stateAnim = StateAnimations.animation(for: state)
+        let transition = StateAnimations.transitionAction(to: state, baseScale: baseScale)
+        let stateAnim = StateAnimations.animation(for: state, baseScale: baseScale)
         run(SKAction.sequence([transition, stateAnim]), withKey: "stateAnim")
     }
 

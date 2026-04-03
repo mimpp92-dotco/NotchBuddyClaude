@@ -14,7 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Dock에 표시하지 않음 (메뉴바 전용 앱)
         NSApp.setActivationPolicy(.accessory)
 
-        // 노치 윈도우 생성 및 표시
+        // 노치 윈도우 생성 및 표시 (항상 노치에서 오프닝과 함께 시작)
         notchWindow = NotchWindow()
         notchWindow?.show()
 

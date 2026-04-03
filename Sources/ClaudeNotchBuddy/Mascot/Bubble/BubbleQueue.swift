@@ -24,6 +24,9 @@ final class BubbleQueue {
     /// 왼쪽 가시 영역의 중앙 X (마스코트 위치 기준점)
     private var areaCenter: CGFloat = 0
 
+    /// 현재 마스코트 크기 (말풍선 폰트 자동 스케일용)
+    var mascotSize: MascotSize = .s
+
     init(parentScene: SKScene, mascotNode: SKNode) {
         self.parentScene = parentScene
         self.mascotNode = mascotNode
@@ -47,8 +50,9 @@ final class BubbleQueue {
 
         dismissCurrent()
 
+        let scaledStyle = style.scaled(for: mascotSize)
         let side = sideForMascot(at: mascot.position)
-        let bubble = BubbleNode(text: text, side: side, style: style)
+        let bubble = BubbleNode(text: text, side: side, style: scaledStyle)
         let mascotWidth = (mascot as? SKSpriteNode)?.size.width ?? MascotNode.defaultSize
         bubble.show(in: mascot, mascotWidth: mascotWidth, duration: duration)
 
@@ -62,8 +66,9 @@ final class BubbleQueue {
 
         guard let scene = parentScene, let mascot = mascotNode else { return }
 
+        let scaledStyle = style.scaled(for: mascotSize)
         let side = sideForMascot(at: mascot.position)
-        let bubble = BubbleNode(text: text, side: side, style: style)
+        let bubble = BubbleNode(text: text, side: side, style: scaledStyle)
         let mascotWidth = (mascot as? SKSpriteNode)?.size.width ?? MascotNode.defaultSize
         bubble.show(in: mascot, mascotWidth: mascotWidth, duration: duration)
 

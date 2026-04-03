@@ -94,19 +94,29 @@ final class BubbleNode: SKNode {
     ///   - mascotWidth: 마스코트 너비 (간격 계산용)
     ///   - duration: 표시 시간 (초)
     func show(in mascotNode: SKNode, mascotWidth: CGFloat, duration: TimeInterval = 2.5) {
-        let offset = mascotWidth / 2 + backgroundShape.frame.width / 2 + 6
+        // 말풍선을 씬에 직접 추가 (부모 스케일 영향 없음)
+        guard let scene = mascotNode.scene else { return }
+        let parentScale = max(mascotNode.xScale, 0.1)
+        // 크기별 시각적 보정: S=100%, M=85%, L=70% (스프라이트 투명 여백 비례)
+        let edgeFactor: CGFloat = parentScale > 1.5 ? 0.70 : (parentScale > 1.2 ? 0.85 : 1.10)
+        let visualHalf = mascotWidth * parentScale / 2 * edgeFactor
+        let gap: CGFloat = 2
+        let bubbleHalf = backgroundShape.frame.width / 2
+        let offset = visualHalf + bubbleHalf + gap
 
-        // 마스코트 로컬 좌표 기준 (0,0이 마스코트 중심)
+        // 씬 좌표 기준 배치
+        let mascotPos = mascotNode.position  // 씬 좌표 (앵커 0.5, 1.0)
         switch side {
         case .left:
-            self.position = CGPoint(x: -offset, y: 4)
+            self.position = CGPoint(x: mascotPos.x - offset, y: mascotPos.y + 4)
         case .right:
-            self.position = CGPoint(x: offset, y: 4)
+            self.position = CGPoint(x: mascotPos.x + offset, y: mascotPos.y + 4)
         }
 
         self.alpha = 0
         self.setScale(0.8)
-        mascotNode.addChild(self)
+        self.zPosition = 8
+        scene.addChild(self)
 
         // 등장 애니메이션
         let fadeIn = SKAction.fadeIn(withDuration: 0.15)
