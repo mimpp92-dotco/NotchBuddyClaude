@@ -17,7 +17,7 @@ enum BubblePriority: Int, Comparable {
 final class BubbleQueue {
 
     private weak var parentScene: SKScene?
-    private weak var mascotNode: SKNode?
+    weak var mascotNode: SKNode?
     private var currentBubble: BubbleNode?
     private var currentPriority: BubblePriority = .low
 

@@ -10,7 +10,7 @@ final class MascotNode: SKSpriteNode {
     /// 현재 MascotSize에 따른 기본 스케일 (StateAnimations에 전달)
     var baseScale: CGFloat = 1.0
 
-    private(set) var currentSet: MascotSet = .claude
+    internal var currentSet: MascotSet = .claude
 
     /// 스프라이트 시트 프레임 캐시 (spritecat 전용)
     private var spriteFrames: [MascotState: [SKTexture]]?
@@ -181,9 +181,20 @@ final class MascotNode: SKSpriteNode {
         // 눈 깜빡임 재설정
         setupBlink()
 
-        // 현재 상태 애니메이션 강제 재적용
-        let state = currentState
-        forceSetState(state)
+        // 현재 상태 애니메이션 강제 재적용 (baseScale은 호출 전에 설정되어야 함)
+        forceSetState(currentState)
+    }
+
+    /// 텍스처만 변경하고 애니메이션은 재적용하지 않는다. 외부에서 스케일 제어 시 사용.
+    func setMascotSetWithoutAnimation(_ set: MascotSet) {
+        guard set != currentSet else { return }
+        currentSet = set
+        set.save()
+
+        spriteFrames = nil
+        self.texture = set.generateTexture(size: CGSize(width: 28, height: 28))
+        self.size = MascotNode.displaySize(for: set)
+        setupBlink()
     }
 
     // MARK: - 눈 깜빡임
@@ -208,32 +219,30 @@ final class MascotNode: SKSpriteNode {
                 eyeSize: CGSize(width: w * 0.16, height: h * 0.20),
                 lidColor: NSColor(red: 0.89, green: 0.42, blue: 0.34, alpha: 1.0)
             )
-        case .claudeRabbit:
+        case .rabbit:
             let s = self.size.width
             return EyeConfig(
                 leftPos: CGPoint(x: s * -0.20, y: s * 0.13),
                 rightPos: CGPoint(x: s * 0.20, y: s * 0.13),
                 eyeSize: CGSize(width: 4, height: 4),
-                lidColor: NSColor(red: 0.82, green: 0.52, blue: 0.35, alpha: 1.0)
+                lidColor: NSColor(red: 0.95, green: 0.90, blue: 0.85, alpha: 1.0)
             )
-        case .cat:
+        case .whiteCat:
             let s = self.size.width
             return EyeConfig(
                 leftPos: CGPoint(x: s * -0.20, y: s * 0.13),
                 rightPos: CGPoint(x: s * 0.20, y: s * 0.13),
                 eyeSize: CGSize(width: 4, height: 4),
-                lidColor: NSColor(white: 0.92, alpha: 1.0)
+                lidColor: NSColor(white: 0.95, alpha: 1.0)
             )
-        case .robot:
+        case .blackCat:
             let s = self.size.width
             return EyeConfig(
-                leftPos: CGPoint(x: s * -0.14, y: s * 0.13),
-                rightPos: CGPoint(x: s * 0.14, y: s * 0.13),
-                eyeSize: CGSize(width: 5, height: 4),
-                lidColor: NSColor(white: 0.55, alpha: 1.0)
+                leftPos: CGPoint(x: s * -0.20, y: s * 0.13),
+                rightPos: CGPoint(x: s * 0.20, y: s * 0.13),
+                eyeSize: CGSize(width: 4, height: 4),
+                lidColor: NSColor(white: 0.15, alpha: 1.0)
             )
-        case .spritecat:
-            return nil  // 스프라이트 시트는 자체 애니메이션 사용
         }
     }
 

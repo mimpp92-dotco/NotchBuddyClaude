@@ -6,3 +6,6 @@ DerivedData/
 .harness/
 .omc/
 docs/
+NotchBuddy.app/
+NotchBuddy-*.zip
+AppIcon_new.png

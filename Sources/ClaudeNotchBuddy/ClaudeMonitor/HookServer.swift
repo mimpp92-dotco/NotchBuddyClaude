@@ -8,8 +8,9 @@ struct HookEvent: Sendable {
     let sessionId: String?
     let cwd: String?
     let timestamp: Date
+    let sourcePID: pid_t?  // 훅을 보낸 claude 프로세스의 PID
 
-    init(json: [String: Any]) {
+    init(json: [String: Any], sourcePID: pid_t? = nil) {
         self.hookEventName = json["hook_event_name"] as? String
             ?? json["event"] as? String
             ?? "unknown"
@@ -17,6 +18,7 @@ struct HookEvent: Sendable {
         self.sessionId = json["session_id"] as? String
         self.cwd = json["cwd"] as? String
         self.timestamp = Date()
+        self.sourcePID = sourcePID
     }
 }
 
@@ -72,11 +74,47 @@ final class HookServer {
         print("[HookServer] 중지됨")
     }
 
+    // MARK: - PID 캡처
+
+    /// 우리 서버 포트에 연결된 클라이언트 PID를 찾는다.
+    /// receive 콜백 내부에서 호출 — 이 시점에 TCP 연결이 확실히 활성.
+    nonisolated private static func captureSourcePID(serverPort: UInt16) -> pid_t? {
+        let pipe = Pipe()
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/sbin/lsof")
+        // 우리 서버 포트에 ESTABLISHED 연결이 있는 프로세스 찾기
+        process.arguments = ["-i", "TCP:\(serverPort)", "-sTCP:ESTABLISHED", "-t", "-n", "-P"]
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+        } catch {
+            return nil
+        }
+
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        guard let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !output.isEmpty else {
+            return nil
+        }
+
+        // 여러 PID 중 우리 앱(NotchBuddy) 자신은 제외
+        let myPID = ProcessInfo.processInfo.processIdentifier
+        let pids = output.split(separator: "\n").compactMap { pid_t($0) }.filter { $0 != myPID }
+        return pids.first
+    }
+
     // MARK: - 연결 처리
 
     private func handleConnection(_ connection: NWConnection) {
+        let serverPort = self.port
         connection.start(queue: .main)
         connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { data, _, _, error in
+            // 연결 활성 상태에서 소스 PID 캡처
+            let sourcePID = Self.captureSourcePID(serverPort: serverPort)
+
             // HTTP 200 응답 전송 후 연결 종료
             let response = "HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
             connection.send(content: response.data(using: .utf8), completion: .contentProcessed { _ in
@@ -97,8 +135,8 @@ final class HookServer {
                 return
             }
 
-            let event = HookEvent(json: json)
-            print("[HookServer] 이벤트 수신: \(event.hookEventName)")
+            let event = HookEvent(json: json, sourcePID: sourcePID)
+            print("[HookServer] 이벤트 수신: \(event.hookEventName) (PID: \(sourcePID.map(String.init) ?? "?"))")
 
             Task { @MainActor [weak self] in
                 self?.onEvent?(event)

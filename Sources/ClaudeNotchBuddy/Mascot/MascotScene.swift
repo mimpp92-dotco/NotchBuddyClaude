@@ -8,7 +8,7 @@ import SpriteKit
 /// (윈도우는 좌우 대칭 + 아래로 확장되므로 상단 중앙은 항상 고정)
 final class MascotScene: SKScene {
 
-    private let mascotNode = MascotNode()
+    private var mascotNode = MascotNode()
     private var backgroundNode: SKShapeNode?
     private var shadowNode: SKShapeNode?
     private var bubbleQueue: BubbleQueue?
@@ -21,18 +21,6 @@ final class MascotScene: SKScene {
     /// normal 모드에서 마스코트 위치를 제한하는 constraint
     private var normalConstraints: [SKConstraint]?
 
-    // MARK: - Expanded UI
-
-    /// expanded 모드 UI 컨테이너
-    private var expandedContainer: SKNode?
-    /// 세션 아이템 위치 (클릭 감지용)
-    private var sessionItems: [(rect: CGRect, sessionId: String)] = []
-    /// 설정 버튼 영역
-    private var settingsButtonRect: CGRect = .zero
-    /// 현재 세션 데이터
-    private(set) var currentSessions: [SessionInfo] = []
-    /// 현재 expanded 모드 여부
-    private var isExpanded = false
     /// 오프닝 재생 중 여부 (클릭 무시용)
     private(set) var isPlayingOpening = false
 
@@ -47,21 +35,6 @@ final class MascotScene: SKScene {
 
     private var marqueeItems: [MarqueeItem] = []
     private var activeMarqueeIndex: Int? = nil
-
-    // MARK: - Settings UI
-
-    /// 설정 화면 컨테이너
-    private var settingsContainer: SKNode?
-    /// 설정 화면 표시 여부
-    private(set) var isShowingSettings = false
-    /// 설정 화면에서 선택 중인 언어 인덱스
-    private var languageIndex: Int = 0
-    /// 설정 UI 클릭 영역
-    private var prevButtonRect: CGRect = .zero
-    private var nextButtonRect: CGRect = .zero
-    private var confirmButtonRect: CGRect = .zero
-    private var closeButtonRect: CGRect = .zero
-    private var sizeButtonRects: [MascotSize: CGRect] = [:]
 
     /// 크기 변경 요청 콜백 (NotchWindow에서 연결)
     var onSizeChangeRequested: ((MascotSize) -> Void)?
@@ -98,7 +71,31 @@ final class MascotScene: SKScene {
 
     /// 마스코트 셋을 변경한다.
     func changeMascotSet(_ set: MascotSet) {
-        mascotNode.setMascotSet(set)
+        // 기존 마스코트 위치/상태 백업
+        let pos = mascotNode.position
+        let state = mascotNode.currentState
+
+        // 기존 노드 완전 제거
+        mascotNode.removeAllActions()
+        mascotNode.removeFromParent()
+
+        // 선택 저장 + S 사이즈 강제
+        set.save()
+        MascotSize.s.save()
+        currentMascotSize = .s
+
+        // 새 MascotNode를 UserDefaults 기반으로 생성 (= 앱 시작과 동일)
+        let newNode = MascotNode()
+        newNode.position = pos
+        newNode.zPosition = 10
+        addChild(newNode)
+        mascotNode = newNode
+
+        // 상태 + 말풍선 + 그림자 리셋
+        newNode.forceSetState(state)
+        bubbleQueue?.mascotNode = newNode
+        bubbleQueue?.mascotSize = .s
+        updateShadowForSize(.s)
     }
 
     /// 마스코트 상태를 변경한다.
@@ -126,9 +123,6 @@ final class MascotScene: SKScene {
         removeWorkingEmitter()
         removeNeedsEmitter()
         removePlayingEmitter()
-
-        // expanded 모드에서는 말풍선 비활성화
-        guard !isExpanded else { return }
 
         // 상태별 즉시 말풍선 (크기에 맞게 스케일)
         if let text = BubblePhrases.text(for: state) {
@@ -169,26 +163,7 @@ final class MascotScene: SKScene {
 
     /// 세션 데이터를 업데이트한다.
     func updateSessions(_ sessions: [SessionInfo]) {
-        currentSessions = sessions
-        if isExpanded {
-            renderSessionList()
-        }
-    }
-
-    /// 클릭 좌표에서 세션 ID를 반환한다 (없으면 nil).
-    /// point는 씬 좌표계 (앵커 0.5, 1.0 기준).
-    func sessionIdAtPoint(_ point: CGPoint) -> String? {
-        for item in sessionItems {
-            if item.rect.contains(point) {
-                return item.sessionId
-            }
-        }
-        return nil
-    }
-
-    /// 클릭 좌표가 설정 버튼인지 확인한다.
-    func isSettingsButton(at point: CGPoint) -> Bool {
-        settingsButtonRect.contains(point)
+        // No-op: expanded mode removed
     }
 
     /// 윈도우 리사이즈 전 모든 콘텐츠를 즉시 숨긴다 (배경만 남김).
@@ -215,19 +190,13 @@ final class MascotScene: SKScene {
         mascotNode.yScale = 1.0
         shadowNode?.alpha = 0
         statusLabel?.alpha = 0
-        expandedContainer?.alpha = 0
     }
 
     /// 전환 완료 후 콘텐츠를 페이드인한다.
     func fadeInAfterTransition() {
         let fadeIn = SKAction.fadeIn(withDuration: 0.25)
         mascotNode.run(fadeIn)
-        if isExpanded {
-            expandedContainer?.run(fadeIn)
-            statusLabel?.run(fadeIn)
-        } else {
-            shadowNode?.run(fadeIn)
-        }
+        shadowNode?.run(fadeIn)
     }
 
     /// 모드 변경 시 레이아웃을 업데이트한다.
@@ -236,17 +205,8 @@ final class MascotScene: SKScene {
 
         switch mode {
         case .normal:
-            isExpanded = false
             // normal 모드: constraint 복원 (노치 영역 안에서만 이동)
             mascotNode.constraints = normalConstraints
-            // 말풍선 스케줄 복원
-            updateMascotState(mascotNode.currentState)
-
-            // 설정 화면 + expanded UI 제거
-            if isShowingSettings { closeSettings() }
-            expandedContainer?.removeFromParent()
-            expandedContainer = nil
-            sessionItems = []
             marqueeItems = []
             activeMarqueeIndex = nil
 
@@ -266,194 +226,6 @@ final class MascotScene: SKScene {
             statusLabel?.isHidden = true
             statusLabel?.alpha = 0
 
-        case .expanded:
-            isExpanded = true
-            // expanded 모드: constraint 해제 (전체 패널 영역 사용)
-            mascotNode.constraints = nil
-            // 말풍선 비활성화
-            removeAction(forKey: "idleBubble")
-            removeAction(forKey: "needsBubble")
-            removeAction(forKey: "playBubble")
-            bubbleQueue?.clear()
-
-            // 즉시 위치/스케일 설정 (fadeInAfterTransition에서 페이드인)
-            backgroundNode?.fillColor = .clear  // 블러가 대체하므로 투명 유지
-            shadowNode?.alpha = 0  // expanded에서는 그림자 숨김
-
-            let notchH: CGFloat = 38
-            let visibleH = size.height - notchH
-            let leftCenterX = -size.width / 4
-            let centerY = -(notchH + visibleH * 0.4)
-
-            mascotNode.position = CGPoint(x: leftCenterX, y: centerY)
-            mascotNode.baseScale = 2.0
-            mascotNode.setScale(2.0)
-
-            // 상태 라벨을 마스코트 아래에 (충분한 간격)
-            statusLabel?.isHidden = false
-            statusLabel?.alpha = 1
-            statusLabel?.fontSize = 11
-            statusLabel?.fontColor = NSColor(white: 0.65, alpha: 0.8)
-            statusLabel?.position = CGPoint(x: leftCenterX, y: centerY - 50)
-
-            // 상태 애니메이션 복원 (hideForTransition에서 제거됨)
-            mascotNode.forceSetState(mascotNode.currentState)
-
-            // expanded UI 생성
-            setupExpandedUI()
-        }
-    }
-
-    // MARK: - Expanded UI
-
-    private func setupExpandedUI() {
-        expandedContainer?.removeFromParent()
-
-        let container = SKNode()
-        container.zPosition = 5
-        addChild(container)
-        expandedContainer = container
-
-        let notchH: CGFloat = 38
-        let padding: CGFloat = 16
-        let rightHalfLeft: CGFloat = 10  // 구분선 오른쪽
-
-        // 구분선 (왼쪽 마스코트 영역 | 오른쪽 세션 리스트)
-        let dividerH = size.height - notchH - 24
-        let divider = SKShapeNode(rectOf: CGSize(width: 0.5, height: dividerH))
-        divider.fillColor = NSColor(white: 0.4, alpha: 0.3)
-        divider.strokeColor = .clear
-        divider.position = CGPoint(x: 0, y: -(notchH + dividerH / 2 + 12))
-        container.addChild(divider)
-
-        // "세션" 헤더 (간결하게)
-        let header = SKLabelNode(text: "SESSIONS")
-        header.fontName = "Menlo-Bold"
-        header.fontSize = 11
-        header.fontColor = NSColor(white: 0.8, alpha: 0.9)
-        header.horizontalAlignmentMode = .left
-        header.position = CGPoint(x: rightHalfLeft + padding, y: -(notchH + 18))
-        container.addChild(header)
-
-        // 설정 버튼 (우상단)
-        let settingsLabel = SKLabelNode(text: "⚙")
-        settingsLabel.fontName = "Menlo"
-        settingsLabel.fontSize = 18
-        settingsLabel.fontColor = NSColor(white: 0.7, alpha: 0.8)
-        settingsLabel.horizontalAlignmentMode = .right
-        let settingsX = size.width / 2 - padding
-        let settingsY = -(notchH + 18)
-        settingsLabel.position = CGPoint(x: settingsX, y: settingsY)
-        container.addChild(settingsLabel)
-        settingsButtonRect = CGRect(x: settingsX - 60, y: settingsY - 8, width: 68, height: 24)
-
-        // 세션 리스트 렌더링
-        renderSessionList()
-    }
-
-    private func renderSessionList() {
-        // 기존 세션 노드 + 마키 데이터 제거
-        expandedContainer?.children
-            .filter { $0.name == "sessionItem" }
-            .forEach { $0.removeFromParent() }
-        sessionItems = []
-        marqueeItems = []
-        activeMarqueeIndex = nil
-
-        guard let container = expandedContainer else { return }
-
-        let notchH: CGFloat = 38
-        let padding: CGFloat = 16
-        let startY = -(notchH + 38)
-        let itemHeight: CGFloat = 36
-        let leftX: CGFloat = 10 + padding
-        let rightX = size.width / 2 - padding
-
-        if currentSessions.isEmpty {
-            let emptyText: String = {
-                switch AppLanguage.saved {
-                case .ko: return "활성 세션 없음"
-                case .en: return "No active sessions"
-                case .ja: return "アクティブセッションなし"
-                case .zh: return "没有活跃会话"
-                }
-            }()
-            let empty = SKLabelNode(text: emptyText)
-            empty.fontName = "Menlo"
-            empty.fontSize = 11
-            empty.fontColor = NSColor(white: 0.6, alpha: 0.7)
-            empty.horizontalAlignmentMode = .left
-            empty.position = CGPoint(x: leftX, y: startY - 30)
-            empty.name = "sessionItem"
-            container.addChild(empty)
-            return
-        }
-
-        let maxVisible = min(currentSessions.count, 4)
-
-        for i in 0..<maxVisible {
-            let session = currentSessions[i]
-            let itemY = startY - CGFloat(i) * itemHeight
-
-            let itemNode = SKNode()
-            itemNode.name = "sessionItem"
-
-            // 상태 인디케이터 (작은 원) — 왼쪽에 배치
-            let dot = SKShapeNode(circleOfRadius: 3)
-            dot.fillColor = stateColor(session.state, isEnded: session.isEnded)
-            dot.strokeColor = .clear
-            dot.position = CGPoint(x: leftX, y: itemY + 3)
-            itemNode.addChild(dot)
-
-            // 폴더명 — dot 오른쪽 (SKCropNode로 마키 스크롤 지원)
-            let folderLabel = SKLabelNode(text: session.folderName)
-            folderLabel.fontName = "Menlo-Bold"
-            folderLabel.fontSize = 12
-            folderLabel.fontColor = session.isEnded
-                ? NSColor(white: 0.5, alpha: 0.7)
-                : NSColor(white: 0.95, alpha: 1.0)
-            folderLabel.horizontalAlignmentMode = .left
-            folderLabel.position = .zero
-
-            let maxLabelWidth = rightX - (leftX + 12) - 8
-            let maskRect = SKSpriteNode(color: .white, size: CGSize(width: maxLabelWidth, height: 20))
-            maskRect.anchorPoint = CGPoint(x: 0, y: 0.5)
-            maskRect.position = .zero
-
-            let cropNode = SKCropNode()
-            cropNode.maskNode = maskRect
-            cropNode.addChild(folderLabel)
-            cropNode.position = CGPoint(x: leftX + 12, y: itemY)
-            cropNode.name = "folderCrop_\(i)"
-            itemNode.addChild(cropNode)
-
-            // 마지막 이벤트 텍스트
-            let eventLabel = SKLabelNode(text: session.lastEventText)
-            eventLabel.fontName = "Menlo"
-            eventLabel.fontSize = 11
-            eventLabel.fontColor = session.isEnded
-                ? NSColor(white: 0.45, alpha: 0.7)
-                : NSColor(white: 0.65, alpha: 0.8)
-            eventLabel.horizontalAlignmentMode = .left
-            eventLabel.position = CGPoint(x: leftX + 12, y: itemY - 14)
-            itemNode.addChild(eventLabel)
-
-            container.addChild(itemNode)
-
-            // 클릭 영역 (구분선부터 오른쪽 끝까지 넉넉하게)
-            let itemRect = CGRect(x: 0, y: itemY - 20, width: rightX + 4, height: itemHeight)
-            sessionItems.append((rect: itemRect, sessionId: session.sessionId))
-
-            // 텍스트가 마스크보다 넓으면 마키 대상 등록
-            let textWidth = folderLabel.frame.width
-            if textWidth > maxLabelWidth {
-                marqueeItems.append(MarqueeItem(
-                    cropNode: cropNode,
-                    label: folderLabel,
-                    overflow: textWidth - maxLabelWidth + 16,
-                    rect: itemRect
-                ))
-            }
         }
     }
 
@@ -495,7 +267,6 @@ final class MascotScene: SKScene {
 
     /// 데스크탑 모드 레이아웃: 마스코트를 윈도우 중앙에 배치
     func updateDesktopLayout() {
-        isExpanded = false
         mascotNode.constraints = nil
         mascotNode.position = CGPoint(x: 0, y: -size.height / 2)
         mascotNode.baseScale = currentMascotSize.scale
@@ -508,9 +279,6 @@ final class MascotScene: SKScene {
         statusLabel?.isHidden = true
         statusLabel?.alpha = 0
 
-        expandedContainer?.removeFromParent()
-        expandedContainer = nil
-        sessionItems = []
         marqueeItems = []
         activeMarqueeIndex = nil
 
@@ -565,202 +333,28 @@ final class MascotScene: SKScene {
         shadow.strokeColor = .clear
         shadow.zPosition = 0.5
         shadow.glowWidth = 3.0 * size.scale
+        // 크기별 그림자 간격: S=2, M=6, L=12
+        let gap: CGFloat
+        switch size {
+        case .s: gap = 2
+        case .m: gap = 6
+        case .l: gap = 12
+        }
         shadow.position = CGPoint(
             x: mascotNode.position.x,
-            y: mascotNode.position.y - MascotNode.maxHeight * size.scale / 2 - 2
+            y: mascotNode.position.y - MascotNode.maxHeight * size.scale / 2 - gap
         )
-        shadow.alpha = isExpanded ? 0 : 1  // expanded에서는 그림자 숨김
+        shadow.alpha = 1
         addChild(shadow)
         shadowNode = shadow
     }
 
-    /// 데스크탑 expanded 시 상단 오프셋 (노치 높이 대체)
-    private var desktopExpandedTopOffset: CGFloat = 0
-
-    /// 데스크탑 expanded 레이아웃: 마스코트 + 세션 리스트
-    func updateDesktopExpandedLayout(direction: NotchGeometry.ExpandDirection) {
-        isExpanded = true
-        mascotNode.constraints = nil
-
-        // 말풍선 비활성화
-        removeAction(forKey: "idleBubble")
-        removeAction(forKey: "needsBubble")
-        removeAction(forKey: "playBubble")
-        bubbleQueue?.clear()
-
-        backgroundNode?.fillColor = .clear
-        shadowNode?.alpha = 0
-
-        // 패딩
-        let topPad: CGFloat = 16
-        desktopExpandedTopOffset = topPad
-
-        // 마스코트: 왼쪽 영역 중앙
-        let leftCenterX = -size.width / 4
-        let centerY = -(size.height / 2)
-
-        mascotNode.position = CGPoint(x: leftCenterX, y: centerY)
-        mascotNode.baseScale = 1.8
-        mascotNode.setScale(1.8)
-
-        // 상태 라벨
-        statusLabel?.isHidden = false
-        statusLabel?.alpha = 1
-        statusLabel?.fontSize = 11
-        statusLabel?.fontColor = NSColor(white: 0.65, alpha: 0.8)
-        statusLabel?.position = CGPoint(x: leftCenterX, y: centerY - 45)
-
-        mascotNode.forceSetState(mascotNode.currentState)
-        setupDesktopExpandedUI()
-    }
-
-    /// 데스크탑 전용 expanded UI (노치 높이 제약 없는 버전)
-    private func setupDesktopExpandedUI() {
-        expandedContainer?.removeFromParent()
-
-        let container = SKNode()
-        container.zPosition = 5
-        addChild(container)
-        expandedContainer = container
-
-        let topPad: CGFloat = 16
-        let padding: CGFloat = 16
-        let rightHalfLeft: CGFloat = 10
-
-        // 구분선
-        let dividerH = size.height - topPad * 2 - 16
-        let divider = SKShapeNode(rectOf: CGSize(width: 0.5, height: dividerH))
-        divider.fillColor = NSColor(white: 0.4, alpha: 0.3)
-        divider.strokeColor = .clear
-        divider.position = CGPoint(x: 0, y: -(topPad + dividerH / 2 + 8))
-        container.addChild(divider)
-
-        // "SESSIONS" 헤더
-        let header = SKLabelNode(text: "SESSIONS")
-        header.fontName = "Menlo-Bold"
-        header.fontSize = 11
-        header.fontColor = NSColor(white: 0.8, alpha: 0.9)
-        header.horizontalAlignmentMode = .left
-        header.position = CGPoint(x: rightHalfLeft + padding, y: -(topPad + 14))
-        container.addChild(header)
-
-        // 설정 버튼
-        let settingsLabel = SKLabelNode(text: "⚙")
-        settingsLabel.fontName = "Menlo"
-        settingsLabel.fontSize = 18
-        settingsLabel.fontColor = NSColor(white: 0.7, alpha: 0.8)
-        settingsLabel.horizontalAlignmentMode = .right
-        let settingsX = size.width / 2 - padding
-        let settingsY = -(topPad + 14)
-        settingsLabel.position = CGPoint(x: settingsX, y: settingsY)
-        container.addChild(settingsLabel)
-        settingsButtonRect = CGRect(x: settingsX - 60, y: settingsY - 8, width: 68, height: 24)
-
-        // 세션 리스트
-        renderDesktopSessionList(topOffset: topPad)
-    }
-
-    /// 데스크탑 expanded 세션 리스트 렌더링
-    private func renderDesktopSessionList(topOffset: CGFloat) {
-        guard let container = expandedContainer else { return }
-        sessionItems = []
-        marqueeItems = []
-        activeMarqueeIndex = nil
-
-        let padding: CGFloat = 16
-        let startY = -(topOffset + 34)
-        let itemHeight: CGFloat = 36
-        let leftX: CGFloat = 10 + padding
-        let rightX = size.width / 2 - padding
-
-        if currentSessions.isEmpty {
-            let emptyText: String = {
-                switch AppLanguage.saved {
-                case .ko: return "활성 세션 없음"
-                case .en: return "No active sessions"
-                case .ja: return "アクティブセッションなし"
-                case .zh: return "没有活跃会话"
-                }
-            }()
-            let empty = SKLabelNode(text: emptyText)
-            empty.fontName = "Menlo"
-            empty.fontSize = 11
-            empty.fontColor = NSColor(white: 0.6, alpha: 0.7)
-            empty.horizontalAlignmentMode = .left
-            empty.position = CGPoint(x: leftX, y: startY - 30)
-            empty.name = "sessionItem"
-            container.addChild(empty)
-            return
-        }
-
-        let maxVisible = min(currentSessions.count, 4)
-
-        for i in 0..<maxVisible {
-            let session = currentSessions[i]
-            let itemY = startY - CGFloat(i) * itemHeight
-
-            let itemNode = SKNode()
-            itemNode.name = "sessionItem"
-
-            let dot = SKShapeNode(circleOfRadius: 3)
-            dot.fillColor = stateColor(session.state, isEnded: session.isEnded)
-            dot.strokeColor = .clear
-            dot.position = CGPoint(x: leftX, y: itemY + 3)
-            itemNode.addChild(dot)
-
-            let folderLabel = SKLabelNode(text: session.folderName)
-            folderLabel.fontName = "Menlo-Bold"
-            folderLabel.fontSize = 12
-            folderLabel.fontColor = session.isEnded
-                ? NSColor(white: 0.5, alpha: 0.7)
-                : NSColor(white: 0.95, alpha: 1.0)
-            folderLabel.horizontalAlignmentMode = .left
-            folderLabel.position = .zero
-
-            let maxLabelWidth = rightX - (leftX + 12) - 8
-            let maskRect = SKSpriteNode(color: .white, size: CGSize(width: maxLabelWidth, height: 20))
-            maskRect.anchorPoint = CGPoint(x: 0, y: 0.5)
-            maskRect.position = .zero
-
-            let cropNode = SKCropNode()
-            cropNode.maskNode = maskRect
-            cropNode.addChild(folderLabel)
-            cropNode.position = CGPoint(x: leftX + 12, y: itemY)
-            cropNode.name = "folderCrop_\(i)"
-            itemNode.addChild(cropNode)
-
-            let eventLabel = SKLabelNode(text: session.lastEventText)
-            eventLabel.fontName = "Menlo"
-            eventLabel.fontSize = 11
-            eventLabel.fontColor = session.isEnded
-                ? NSColor(white: 0.45, alpha: 0.7)
-                : NSColor(white: 0.65, alpha: 0.8)
-            eventLabel.horizontalAlignmentMode = .left
-            eventLabel.position = CGPoint(x: leftX + 12, y: itemY - 14)
-            itemNode.addChild(eventLabel)
-
-            container.addChild(itemNode)
-
-            let itemRect = CGRect(x: 0, y: itemY - 20, width: rightX + 4, height: itemHeight)
-            sessionItems.append((rect: itemRect, sessionId: session.sessionId))
-
-            let textWidth = folderLabel.frame.width
-            if textWidth > maxLabelWidth {
-                marqueeItems.append(MarqueeItem(
-                    cropNode: cropNode,
-                    label: folderLabel,
-                    overflow: textWidth - maxLabelWidth + 16,
-                    rect: itemRect
-                ))
-            }
-        }
-    }
 
     // MARK: - Marquee Scroll
 
-    /// 마우스 이동 시 호출 — expanded 모드에서 긴 세션명 마키 스크롤
+    /// 마우스 이동 시 호출 — 긴 세션명 마키 스크롤
     func handleMouseMoved(at scenePoint: CGPoint) {
-        guard isExpanded, !marqueeItems.isEmpty else { return }
+        guard !marqueeItems.isEmpty else { return }
 
         var hoveredIndex: Int? = nil
         for (i, item) in marqueeItems.enumerated() {
@@ -810,220 +404,6 @@ final class MascotScene: SKScene {
         }
     }
 
-    // MARK: - Settings UI
-
-    /// 설정 화면(언어 선택)을 표시한다.
-    func showSettings() {
-        guard isExpanded, !isShowingSettings else { return }
-        isShowingSettings = true
-        languageIndex = AppLanguage.allCases.firstIndex(of: AppLanguage.saved) ?? 0
-        sizeButtonRects = [:]
-
-        // expanded UI + 마스코트 숨기기
-        expandedContainer?.alpha = 0
-        mascotNode.alpha = 0
-        statusLabel?.alpha = 0
-
-        let container = SKNode()
-        container.zPosition = 10
-        addChild(container)
-        settingsContainer = container
-
-        let topPad: CGFloat = isDesktopMode ? 16 : 38
-        let centerX: CGFloat = 0
-        var cursorY = -(topPad + 20)
-
-        // ✕ 닫기 (우상단, 큰 터치 영역)
-        let closeLabel = SKLabelNode(text: "✕")
-        closeLabel.fontName = "Menlo-Bold"
-        closeLabel.fontSize = 20
-        closeLabel.fontColor = NSColor(white: 0.55, alpha: 0.8)
-        let closeX = size.width / 2 - 22
-        let closeY = -(topPad + 16)
-        closeLabel.position = CGPoint(x: closeX, y: closeY)
-        container.addChild(closeLabel)
-        closeButtonRect = CGRect(x: closeX - 20, y: closeY - 14, width: 40, height: 36)
-
-        // === SIZE 섹션 (데스크탑만) ===
-        if isDesktopMode {
-            let sizeHeader = SKLabelNode(text: "SIZE")
-            sizeHeader.fontName = "Menlo-Bold"
-            sizeHeader.fontSize = 13
-            sizeHeader.fontColor = NSColor(white: 0.7, alpha: 0.8)
-            sizeHeader.position = CGPoint(x: centerX, y: cursorY)
-            container.addChild(sizeHeader)
-
-            cursorY -= 30
-
-            // S / M / L 버튼 (가로 배치)
-            let sizes: [MascotSize] = [.s, .m, .l]
-            let btnSpacing: CGFloat = 50
-            let startX = centerX - btnSpacing
-
-            for (i, sz) in sizes.enumerated() {
-                let x = startX + CGFloat(i) * btnSpacing
-                let isActive = (sz == currentMascotSize)
-
-                let label = SKLabelNode(text: sz.displayName)
-                label.fontName = "Menlo-Bold"
-                label.fontSize = 14
-                label.fontColor = isActive
-                    ? NSColor(red: 0.91, green: 0.49, blue: 0.36, alpha: 1.0)  // Claude 오렌지
-                    : NSColor(white: 0.6, alpha: 0.8)
-                label.position = CGPoint(x: x, y: cursorY)
-                label.name = "sizeBtn_\(sz.rawValue)"
-                container.addChild(label)
-
-                sizeButtonRects[sz] = CGRect(x: x - 18, y: cursorY - 10, width: 36, height: 28)
-            }
-
-            cursorY -= 40
-        } else {
-            // 노치 모드: SIZE 섹션 생략, LANGUAGE를 중앙에 배치
-            cursorY = -(size.height * 0.35)
-        }
-
-        // === LANGUAGE 섹션 ===
-        let langHeader = SKLabelNode(text: "LANGUAGE")
-        langHeader.fontName = "Menlo-Bold"
-        langHeader.fontSize = 13
-        langHeader.fontColor = NSColor(white: 0.7, alpha: 0.8)
-        langHeader.position = CGPoint(x: centerX, y: cursorY)
-        container.addChild(langHeader)
-
-        cursorY -= 30
-
-        // ◀ 언어 이름 ▶
-        let allLangs = AppLanguage.allCases
-        let nameLabel = SKLabelNode(text: allLangs[languageIndex].displayName)
-        nameLabel.fontName = "Menlo-Bold"
-        nameLabel.fontSize = 16
-        nameLabel.fontColor = NSColor(white: 0.85, alpha: 1.0)
-        nameLabel.position = CGPoint(x: centerX, y: cursorY)
-        nameLabel.name = "settingsName"
-        container.addChild(nameLabel)
-
-        let prevLabel = SKLabelNode(text: "◀")
-        prevLabel.fontSize = 14
-        prevLabel.fontColor = NSColor(white: 0.6, alpha: 0.8)
-        let prevX = centerX - 70
-        prevLabel.position = CGPoint(x: prevX, y: cursorY)
-        container.addChild(prevLabel)
-        prevButtonRect = CGRect(x: prevX - 16, y: cursorY - 10, width: 32, height: 28)
-
-        let nextLabel = SKLabelNode(text: "▶")
-        nextLabel.fontSize = 14
-        nextLabel.fontColor = NSColor(white: 0.6, alpha: 0.8)
-        let nextX = centerX + 70
-        nextLabel.position = CGPoint(x: nextX, y: cursorY)
-        container.addChild(nextLabel)
-        nextButtonRect = CGRect(x: nextX - 16, y: cursorY - 10, width: 32, height: 28)
-
-        // OK 버튼
-        let confirmLabel = SKLabelNode(text: "OK")
-        confirmLabel.fontName = "Menlo-Bold"
-        confirmLabel.fontSize = 14
-        confirmLabel.fontColor = NSColor(red: 0.4, green: 0.75, blue: 1.0, alpha: 1.0)
-        let confirmY = -(size.height - 18)
-        confirmLabel.position = CGPoint(x: centerX, y: confirmY)
-        container.addChild(confirmLabel)
-        confirmButtonRect = CGRect(x: centerX - 30, y: confirmY - 10, width: 60, height: 28)
-    }
-
-    /// 설정 화면을 닫는다 (저장 없이).
-    func closeSettings() {
-        settingsContainer?.removeFromParent()
-        settingsContainer = nil
-        isShowingSettings = false
-
-        // expanded UI 복원
-        expandedContainer?.alpha = 1
-        mascotNode.alpha = 1
-        statusLabel?.alpha = 1
-    }
-
-    /// 설정을 확인하고 닫는다 (언어 변경 저장).
-    func confirmSettings() {
-        let allLangs = AppLanguage.allCases
-        let selected = allLangs[languageIndex]
-        selected.save()
-        // 상태 라벨 즉시 갱신
-        statusLabel?.text = mascotNode.currentState.displayName
-        closeSettings()
-        // expanded UI 세션 리스트 즉시 새로고침 (언어 반영)
-        if isExpanded {
-            renderSessionList()
-        }
-    }
-
-    /// 설정 화면에서 이전 언어로 변경한다.
-    func settingsPrev() {
-        let allLangs = AppLanguage.allCases
-        languageIndex = (languageIndex - 1 + allLangs.count) % allLangs.count
-        updateSettingsPreview()
-    }
-
-    /// 설정 화면에서 다음 언어로 변경한다.
-    func settingsNext() {
-        let allLangs = AppLanguage.allCases
-        languageIndex = (languageIndex + 1) % allLangs.count
-        updateSettingsPreview()
-    }
-
-    /// 설정 화면 클릭 처리. 처리한 경우 true.
-    func handleSettingsClick(at point: CGPoint) -> Bool {
-        guard isShowingSettings else { return false }
-
-        if closeButtonRect.contains(point) {
-            closeSettings()
-            return true
-        }
-        if confirmButtonRect.contains(point) {
-            confirmSettings()
-            return true
-        }
-        if prevButtonRect.contains(point) {
-            settingsPrev()
-            return true
-        }
-        if nextButtonRect.contains(point) {
-            settingsNext()
-            return true
-        }
-        // 크기 버튼 확인
-        for (sz, rect) in sizeButtonRects {
-            if rect.contains(point) {
-                selectSize(sz)
-                return true
-            }
-        }
-        return true  // 설정 화면에서는 다른 클릭 무시
-    }
-
-    /// 크기 선택 처리
-    private func selectSize(_ size: MascotSize) {
-        guard isDesktopMode else { return }
-        // currentMascotSize는 setMascotSize에서 설정 (guard 통과하도록)
-        onSizeChangeRequested?(size)
-
-        // 버튼 하이라이트 업데이트
-        for sz in MascotSize.allCases {
-            if let label = settingsContainer?.childNode(withName: "sizeBtn_\(sz.rawValue)") as? SKLabelNode {
-                label.fontColor = (sz == size)
-                    ? NSColor(red: 0.91, green: 0.49, blue: 0.36, alpha: 1.0)
-                    : NSColor(white: 0.6, alpha: 0.8)
-            }
-        }
-    }
-
-    private func updateSettingsPreview() {
-        let allLangs = AppLanguage.allCases
-        let lang = allLangs[languageIndex]
-
-        if let nameLabel = settingsContainer?.childNode(withName: "settingsName") as? SKLabelNode {
-            nameLabel.text = lang.displayName
-        }
-    }
 
     // MARK: - Setup
 
@@ -1040,15 +420,22 @@ final class MascotScene: SKScene {
     }
 
     private func setupShadow() {
-        let shadow = SKShapeNode(ellipseOf: CGSize(width: 30, height: 10))
+        let size = currentMascotSize
+        let shadow = SKShapeNode(ellipseOf: size.shadowSize)
         shadow.fillColor = NSColor(white: 0.0, alpha: 0.25)
         shadow.strokeColor = .clear
         shadow.zPosition = 0.5
+        let gap: CGFloat
+        switch size {
+        case .s: gap = 2
+        case .m: gap = 6
+        case .l: gap = 12
+        }
         shadow.position = CGPoint(
             x: normalMascotPosition.x,
-            y: normalMascotPosition.y - MascotNode.maxHeight / 2 - 2
+            y: normalMascotPosition.y - MascotNode.maxHeight * size.scale / 2 - gap
         )
-        shadow.glowWidth = 3.0
+        shadow.glowWidth = 3.0 * size.scale
         shadow.alpha = 0  // 오프닝 후 페이드인
         addChild(shadow)
         shadowNode = shadow
@@ -1223,7 +610,6 @@ final class MascotScene: SKScene {
     private func scheduleIdleBubble() {
         let wait = SKAction.wait(forDuration: 12.5, withRange: 5) // 10~15초
         let show = SKAction.run { [weak self] in
-            guard self?.isExpanded == false else { return }
             let text = BubblePhrases.randomIdlePhrase()
             self?.bubbleQueue?.enqueue(text: text, priority: .low, style: .normal)
         }
@@ -1233,7 +619,6 @@ final class MascotScene: SKScene {
     private func scheduleRepeatingBubble(state: MascotState) {
         let wait = SKAction.wait(forDuration: 12.5, withRange: 5) // 10~15초
         let show = SKAction.run { [weak self] in
-            guard self?.isExpanded == false else { return }
             let text = BubblePhrases.needsInputPhrase()
             self?.bubbleQueue?.enqueue(text: text, priority: .high, style: .alert)
         }
@@ -1243,7 +628,6 @@ final class MascotScene: SKScene {
     private func schedulePlayingBubbles() {
         let wait = SKAction.wait(forDuration: 12.5, withRange: 5) // 10~15초
         let show = SKAction.run { [weak self] in
-            guard self?.isExpanded == false else { return }
             let text = BubblePhrases.randomPlayingPhrase()
             self?.bubbleQueue?.enqueue(text: text, priority: .low, style: .normal)
         }
@@ -1253,7 +637,6 @@ final class MascotScene: SKScene {
     private func scheduleWorkingBubbles() {
         let wait = SKAction.wait(forDuration: 12.5, withRange: 5) // 10~15초
         let show = SKAction.run { [weak self] in
-            guard self?.isExpanded == false else { return }
             let text = BubblePhrases.workingPhrase()
             self?.bubbleQueue?.enqueue(text: text, priority: .low, style: .normal)
         }
@@ -1263,7 +646,6 @@ final class MascotScene: SKScene {
     private func scheduleDoneBubbles() {
         let wait = SKAction.wait(forDuration: 12.5, withRange: 5) // 10~15초
         let show = SKAction.run { [weak self] in
-            guard self?.isExpanded == false else { return }
             let text = BubblePhrases.text(for: .done) ?? "완료!"
             self?.bubbleQueue?.enqueue(text: text, priority: .normal, style: .success)
         }
@@ -1512,7 +894,6 @@ final class MascotScene: SKScene {
     private func scheduleRandomReactions() {
         let wait = SKAction.wait(forDuration: 45, withRange: 30) // 30~60초 간격
         let react = SKAction.run { [weak self] in
-            guard self?.isExpanded == false else { return }
             self?.playRandomReaction()
         }
         run(SKAction.repeatForever(SKAction.sequence([wait, react])), withKey: "randomReaction")
@@ -1601,6 +982,15 @@ final class MascotScene: SKScene {
         emitter.particleTexture = SKTexture(image: texImage)
         emitter.numParticlesToEmit = 0
         return emitter
+    }
+
+    // MARK: - 프레임 업데이트 (그림자 추적)
+
+    override func update(_ currentTime: TimeInterval) {
+        super.update(currentTime)
+        // 그림자가 마스코트의 X 위치를 따라감 (보이는 경우만)
+        guard let shadow = shadowNode, shadow.alpha > 0 else { return }
+        shadow.position = CGPoint(x: mascotNode.position.x, y: shadow.position.y)
     }
 
 }

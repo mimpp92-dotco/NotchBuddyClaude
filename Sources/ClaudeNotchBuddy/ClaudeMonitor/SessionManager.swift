@@ -9,6 +9,7 @@ struct SessionInfo: Sendable {
     var lastToolName: String?     // 도구 이름 (있으면)
     var lastEventTime: Date
     var isEnded: Bool
+    var terminalApp: TerminalApp
 
     /// 현재 언어에 맞는 이벤트 텍스트를 반환한다.
     var lastEventText: String {
@@ -130,14 +131,20 @@ final class SessionManager {
             existing.isEnded = isEnd
             sessions[sessionId] = existing
         } else {
-            // 같은 폴더의 이전 세션이 있으면 교체 (재시작 대응)
-            if let oldId = sessions.first(where: {
-                $0.value.folderName == folderName && $0.key != sessionId
-            })?.key {
+            // 종료된 세션 정리 (같은 폴더 & 종료됨 & 30초 이상 경과)
+            let now = Date()
+            let staleIds = sessions.filter {
+                $0.value.folderName == folderName &&
+                $0.key != sessionId &&
+                $0.value.isEnded &&
+                now.timeIntervalSince($0.value.lastEventTime) > 30
+            }.map(\.key)
+            for oldId in staleIds {
                 sessions.removeValue(forKey: oldId)
-                print("[SessionManager] 이전 세션 \(oldId.prefix(8))... 교체됨")
             }
 
+            // 새 세션: 앱 감지 (sourcePID로 정확한 매핑)
+            let app = TerminalAppDetector.detect(cwd: event.cwd ?? "", sessionId: event.sessionId, sourcePID: event.sourcePID)
             sessions[sessionId] = SessionInfo(
                 sessionId: sessionId,
                 folderName: folderName,
@@ -145,7 +152,8 @@ final class SessionManager {
                 lastEventKey: event.hookEventName,
                 lastToolName: event.toolName,
                 lastEventTime: event.timestamp,
-                isEnded: isEnd
+                isEnded: isEnd,
+                terminalApp: app
             )
         }
 

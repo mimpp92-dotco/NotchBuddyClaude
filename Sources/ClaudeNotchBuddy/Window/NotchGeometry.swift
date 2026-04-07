@@ -14,7 +14,6 @@ struct NotchGeometry {
 
     enum DisplayMode {
         case normal     // 기본: 노치 좌우 확장
-        case expanded   // 클릭: 아래로 확장
     }
 
     // MARK: - 노치 감지
@@ -98,21 +97,9 @@ struct NotchGeometry {
     ) -> NSRect {
         let info = getNotchInfo(screen: screen)
 
-        let extraLeft: CGFloat
-        let extraRight: CGFloat
-        let extraBottom: CGFloat
-
-        switch mode {
-        case .normal:
-            extraLeft = leftExtension
-            extraRight = rightExtension
-            extraBottom = 0
-        case .expanded:
-            // 물리적 노치 기준 좌우 대칭 확장
-            extraLeft = 190
-            extraRight = 190
-            extraBottom = 180
-        }
+        let extraLeft = leftExtension
+        let extraRight = rightExtension
+        let extraBottom: CGFloat = 0
 
         // 윈도우: 노치 좌우 비대칭 확장 (왼쪽 넓게, 오른쪽 최소)
         let windowLeft = info.notchLeft - extraLeft
@@ -124,44 +111,6 @@ struct NotchGeometry {
         let windowY = info.screenFrame.maxY - windowHeight
 
         return NSRect(x: windowLeft, y: windowY, width: windowWidth, height: windowHeight)
-    }
-
-    // MARK: - 데스크탑 Expanded 프레임
-
-    enum ExpandDirection {
-        case down, up
-    }
-
-    /// 데스크탑 모드에서 expanded 프레임을 계산한다.
-    /// 마스코트 중심 좌표 기준으로 방향을 자동 결정한다.
-    static func calculateDesktopExpandedFrame(
-        mascotCenter: NSPoint,
-        screen: NSScreen = notchScreen()
-    ) -> (frame: NSRect, direction: ExpandDirection) {
-        let expandedW: CGFloat = 380
-        let expandedH: CGFloat = 180
-        let mascotAreaH: CGFloat = 50  // 마스코트 높이 + 여유
-        let screenFrame = screen.visibleFrame
-
-        // 방향 결정: 아래 여유 확인
-        let spaceBelow = mascotCenter.y - screenFrame.minY
-        let direction: ExpandDirection = spaceBelow < (expandedH + 40) ? .up : .down
-
-        // X 위치: 마스코트 중앙 기준, 화면 경계 클램프
-        var x = mascotCenter.x - expandedW / 2
-        x = max(screenFrame.minX + 8, min(x, screenFrame.maxX - expandedW - 8))
-
-        // Y 위치: 방향에 따라
-        let y: CGFloat
-        switch direction {
-        case .down:
-            y = mascotCenter.y - mascotAreaH / 2 - expandedH
-        case .up:
-            y = mascotCenter.y + mascotAreaH / 2
-        }
-
-        let frame = NSRect(x: x, y: y, width: expandedW, height: expandedH + mascotAreaH)
-        return (frame, direction)
     }
 
     /// 윈도우 좌표계에서 노치의 좌/우 경계를 반환한다 (마스코트 배치용).
