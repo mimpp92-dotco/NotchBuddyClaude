@@ -108,7 +108,14 @@ struct NotchGeometry {
         let windowHeight = info.notchHeight + extraBottom
 
         // macOS 좌표계: y=0이 아래
-        let windowY = info.screenFrame.maxY - windowHeight
+        let windowY: CGFloat
+        if hasNotch(screen: screen) {
+            // 노치 있음: 화면 최상단에 배치 (기존 동작)
+            windowY = info.screenFrame.maxY - windowHeight
+        } else {
+            // 노치 없음: 메뉴바 아래에 배치
+            windowY = screen.visibleFrame.maxY
+        }
 
         return NSRect(x: windowLeft, y: windowY, width: windowWidth, height: windowHeight)
     }

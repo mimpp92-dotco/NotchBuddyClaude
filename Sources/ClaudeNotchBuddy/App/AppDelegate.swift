@@ -29,9 +29,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         // 메뉴바 아이콘 + 팝오버 설정
         setupStatusItem()
 
-        // 마스코트 클릭 → 팝오버 열기 연결
+        // 마스코트 클릭 → 팝오버를 마스코트 아래에 열기
         notchWindow?.onPopoverRequested = { [weak self] in
-            self?.togglePopover(nil)
+            self?.togglePopoverFromMascot()
         }
 
         // 화면 변경 감지
@@ -162,6 +162,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             // 팝오버를 key window로 만들어 첫 클릭이 즉시 반응하도록
             NSApp.activate(ignoringOtherApps: true)
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+            popover.contentViewController?.view.window?.makeKey()
+        }
+    }
+
+    private func togglePopoverFromMascot() {
+        guard let popover,
+              let contentView = notchWindow?.panel.contentView
+        else { return }
+
+        if popover.isShown {
+            closePopover()
+        } else {
+            if let sessions = sessionManager?.sortedSessions {
+                popoverViewModel?.updateSessions(sessions)
+            }
+            popoverViewModel?.currentLanguage = AppLanguage.saved
+            popoverViewModel?.currentSize = notchWindow?.currentMascotSize ?? MascotSize.saved
+            popoverViewModel?.currentMascot = MascotSet.saved
+
+            NSApp.activate(ignoringOtherApps: true)
+            let rect = NSRect(
+                x: contentView.bounds.midX - 20,
+                y: 0, width: 40, height: 1
+            )
+            popover.show(relativeTo: rect, of: contentView, preferredEdge: .minY)
             popover.contentViewController?.view.window?.makeKey()
         }
     }
