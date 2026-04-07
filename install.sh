@@ -6,7 +6,7 @@ APP_PATH="/Applications/$APP_NAME.app"
 CLAUDE_DIR="$HOME/.claude"
 SETTINGS="$CLAUDE_DIR/settings.json"
 HOOK_URL="http://localhost:31982/hook"
-ZIP_URL="https://github.com/mimpp92-dotco/NotchBuddyClaude/releases/latest/download/NotchBuddy-v1.0.0.zip"
+ZIP_URL="https://github.com/mimpp92-dotco/NotchBuddyClaude/releases/latest/download/NotchBuddy.zip"
 
 # --- 색상 ---
 RED='\033[0;31m'
