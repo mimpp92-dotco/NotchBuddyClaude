@@ -24,14 +24,14 @@ struct MascotSelectorView: View {
                 .buttonStyle(.plain)
             }
 
-            // 마스코트 그리드 (2x2)
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                ForEach(MascotSet.allCases, id: \.rawValue) { set in
-                    mascotCard(set)
+            // 마스코트 그리드 (스크롤 가능)
+            ScrollView {
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                    ForEach(MascotSet.allCases, id: \.rawValue) { set in
+                        mascotCard(set)
+                    }
                 }
             }
-
-            Spacer()
         }
         .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)

@@ -35,7 +35,7 @@ final class MascotNode: SKSpriteNode {
             return CGSize(width: w, height: h)
         }
         if set.isSpriteSheet {
-            // 스프라이트 시트: 정사각형이지만 노치 높이에 맞춤
+            // 스프라이트 시트: 프레임 내 캐릭터가 작으므로 크게 표시
             let s = maxHeight
             return CGSize(width: s, height: s)
         }
@@ -242,6 +242,21 @@ final class MascotNode: SKSpriteNode {
                 rightPos: CGPoint(x: s * 0.20, y: s * 0.13),
                 eyeSize: CGSize(width: 4, height: 4),
                 lidColor: NSColor(white: 0.15, alpha: 1.0)
+            )
+        case .bichon:
+            // bichonImage 눈 위치: (8,18) + (17,18), 크기 3x3, 캔버스 28x28
+            // SpriteKit 좌표: 중심 기준, y 반전 없음 (flipped: false)
+            let w = self.size.width
+            let h = self.size.height
+            // 눈 중심: 좌 (9.5/28, 19.5/28), 우 (18.5/28, 19.5/28) → 중심 기준 오프셋
+            let leftX = (9.5 / 28.0 - 0.5) * w
+            let rightX = (18.5 / 28.0 - 0.5) * w
+            let eyeY = (19.5 / 28.0 - 0.5) * h
+            return EyeConfig(
+                leftPos: CGPoint(x: leftX, y: eyeY),
+                rightPos: CGPoint(x: rightX, y: eyeY),
+                eyeSize: CGSize(width: w * 4.0 / 28.0, height: h * 4.0 / 28.0),
+                lidColor: NSColor(white: 0.92, alpha: 1.0)  // 털 음영색으로 자연스럽게
             )
         }
     }
