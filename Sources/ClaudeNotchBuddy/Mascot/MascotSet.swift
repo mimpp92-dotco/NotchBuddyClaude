@@ -24,7 +24,8 @@ enum MascotSet: String, CaseIterable, Sendable {
     /// 리소스 PNG 파일명 (nil이면 코드 생성 마스코트)
     var imageName: String? {
         switch self {
-        case .claude: return "claude"  // Resources/claude.png
+        case .claude: return "claude"   // Resources/claude.png
+        case .bichon: return "bichon"   // Resources/bichon.png
         default: return nil
         }
     }
@@ -60,7 +61,7 @@ enum MascotSet: String, CaseIterable, Sendable {
         case .rabbit:   return MascotSet.rabbitImage(size: size)
         case .whiteCat: return MascotSet.whiteCatImage(size: size)
         case .blackCat: return MascotSet.blackCatImage(size: size)
-        case .bichon:   return MascotSet.bichonImage(size: size)
+        case .bichon:   return MascotSet.claudeImage(size: size)  // fallback (PNG 우선)
         }
     }
 
@@ -82,7 +83,7 @@ enum MascotSet: String, CaseIterable, Sendable {
         case .rabbit:   return MascotSet.rabbitTexture(size: size)
         case .whiteCat: return MascotSet.whiteCatTexture(size: size)
         case .blackCat: return MascotSet.blackCatTexture(size: size)
-        case .bichon:   return MascotSet.bichonTexture(size: size)
+        case .bichon:   return MascotSet.claudeTexture(size: size)  // fallback (PNG 우선)
         }
     }
 
@@ -249,60 +250,4 @@ enum MascotSet: String, CaseIterable, Sendable {
         SKTexture(image: blackCatImage(size: size))
     }
 
-    // MARK: - Bichon (비숑 프리제)
-
-    static func bichonImage(size: CGSize) -> NSImage {
-        NSImage(size: size, flipped: false) { rect in
-            NSColor.clear.setFill()
-            rect.fill()
-            let body = NSColor(white: 0.97, alpha: 1.0)       // 흰 털
-            let fluff = NSColor(white: 0.92, alpha: 1.0)       // 털 음영
-            let nose = NSColor(white: 0.15, alpha: 1.0)        // 코
-            let tongue = NSColor(red: 1.0, green: 0.5, blue: 0.55, alpha: 1.0)
-            // 발
-            body.setFill()
-            NSBezierPath(rect: NSRect(x: 5, y: 0, width: 4, height: 3)).fill()
-            NSBezierPath(rect: NSRect(x: 19, y: 0, width: 4, height: 3)).fill()
-            // 몸통 (둥글둥글)
-            NSBezierPath(rect: NSRect(x: 3, y: 3, width: 22, height: 10)).fill()
-            fluff.setFill()
-            NSBezierPath(rect: NSRect(x: 7, y: 4, width: 14, height: 7)).fill()
-            // 팔
-            body.setFill()
-            NSBezierPath(rect: NSRect(x: 1, y: 5, width: 3, height: 5)).fill()
-            NSBezierPath(rect: NSRect(x: 24, y: 5, width: 3, height: 5)).fill()
-            // 머리 (큰 둥근 형태 — 비숑 특유의 뽀글머리)
-            NSBezierPath(rect: NSRect(x: 2, y: 13, width: 24, height: 12)).fill()
-            NSBezierPath(rect: NSRect(x: 4, y: 25, width: 20, height: 3)).fill()
-            NSBezierPath(rect: NSRect(x: 6, y: 28, width: 16, height: 2)).fill()
-            // 뽀글뽀글 털 (머리 위 돌출)
-            fluff.setFill()
-            NSBezierPath(rect: NSRect(x: 3, y: 14, width: 22, height: 10)).fill()
-            body.setFill()
-            NSBezierPath(rect: NSRect(x: 5, y: 24, width: 18, height: 4)).fill()
-            // 귀 (작고 둥글게, 털에 묻힘)
-            fluff.setFill()
-            NSBezierPath(rect: NSRect(x: 2, y: 18, width: 4, height: 5)).fill()
-            NSBezierPath(rect: NSRect(x: 22, y: 18, width: 4, height: 5)).fill()
-            // 눈 (검고 동글)
-            NSColor.black.setFill()
-            NSBezierPath(rect: NSRect(x: 8, y: 18, width: 3, height: 3)).fill()
-            NSBezierPath(rect: NSRect(x: 17, y: 18, width: 3, height: 3)).fill()
-            // 눈 하이라이트
-            NSColor.white.setFill()
-            NSBezierPath(rect: NSRect(x: 9, y: 19, width: 1, height: 1)).fill()
-            NSBezierPath(rect: NSRect(x: 18, y: 19, width: 1, height: 1)).fill()
-            // 코
-            nose.setFill()
-            NSBezierPath(rect: NSRect(x: 12, y: 15, width: 4, height: 3)).fill()
-            // 혀 (살짝 내민)
-            tongue.setFill()
-            NSBezierPath(rect: NSRect(x: 13, y: 13, width: 2, height: 2)).fill()
-            return true
-        }
-    }
-
-    private static func bichonTexture(size: CGSize) -> SKTexture {
-        SKTexture(image: bichonImage(size: size))
-    }
 }

@@ -229,13 +229,24 @@ final class MascotScene: SKScene {
         }
     }
 
+    /// 씬 좌표에서 마스코트 근처인지 판정한다.
+    func isMascotHit(at scenePoint: CGPoint, radius: CGFloat = 30) -> Bool {
+        let dx = scenePoint.x - mascotNode.position.x
+        let dy = scenePoint.y - mascotNode.position.y
+        return sqrt(dx * dx + dy * dy) < radius
+    }
+
     /// 노치 모드에서 마스코트 X 위치를 설정한다 (드래그 드롭 위치 기반).
     func setMascotX(_ x: CGFloat) {
-        // constraint 범위 내로 클램프
+        // 화면 가시 영역 내로 클램프
         let halfMascot = MascotNode.maxHeight / 2
-        let windowHalfW = size.width / 2
-        let minX = -windowHalfW + halfMascot + 4
-        let maxX = windowHalfW - halfMascot - 4
+        let info = NotchGeometry.getNotchInfo()
+        let normalFrame = NotchGeometry.calculateFrame(mode: .normal)
+        let windowCenterScreen = normalFrame.origin.x + normalFrame.width / 2
+        let screenLeft = info.screenFrame.origin.x - windowCenterScreen
+        let screenRight = info.screenFrame.origin.x + info.screenFrame.width - windowCenterScreen
+        let minX = screenLeft + halfMascot + 4
+        let maxX = screenRight - halfMascot - 4
         let clampedX = min(max(x, minX), maxX)
 
         normalMascotPosition = CGPoint(x: clampedX, y: normalMascotPosition.y)
@@ -459,12 +470,14 @@ final class MascotScene: SKScene {
         mascotNode.zPosition = 1
         addChild(mascotNode)
 
-        // SKConstraint로 마스코트가 노치 양쪽 가시 영역 안에서 이동하도록 제한
+        // SKConstraint로 마스코트가 화면 가시 영역 안에서만 이동하도록 제한
         let halfMascot = MascotNode.maxHeight / 2
         let breathMargin: CGFloat = 3            // 호흡 애니메이션 여유분
-        let windowRightX = normalFrame.width / 2
-        let minX = windowLeftX + halfMascot + 4   // 윈도우 왼쪽 끝 + 여유
-        let maxX = windowRightX - halfMascot - 4  // 윈도우 오른쪽 끝 + 여유 (노치 양쪽)
+        // 노치 좌우 가시 영역 (윈도우 전체가 아닌 화면 내 영역으로 제한)
+        let screenLeft = info.screenFrame.origin.x - windowCenterScreen
+        let screenRight = info.screenFrame.origin.x + info.screenFrame.width - windowCenterScreen
+        let minX = screenLeft + halfMascot + 4
+        let maxX = screenRight - halfMascot - 4
         let minY = -(size.height - halfMascot) - breathMargin  // 윈도우 하단 + 여유
         let maxY = -(halfMascot) + breathMargin                // 윈도우 상단 + 여유
 

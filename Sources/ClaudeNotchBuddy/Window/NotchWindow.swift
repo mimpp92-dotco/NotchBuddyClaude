@@ -151,7 +151,9 @@ final class NotchWindow {
     // MARK: - 클릭 처리
 
     private func handleClick(at viewPoint: CGPoint) {
-        // 마스코트 클릭 → 팝오버 열기
+        // 마스코트 근처 클릭만 팝오버 열기 (넓은 윈도우 전체가 아닌 마스코트 영역만)
+        let scenePoint = skView.convert(viewPoint, to: mascotScene)
+        guard mascotScene.isMascotHit(at: scenePoint) else { return }
         onPopoverRequested?()
     }
 

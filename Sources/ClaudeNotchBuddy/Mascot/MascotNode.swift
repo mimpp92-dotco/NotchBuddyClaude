@@ -30,7 +30,7 @@ final class MascotNode: SKSpriteNode {
             // PNG 이미지: 비율 유지하면서 노치 높이에 맞춤
             let tex = set.generateTexture(size: CGSize(width: 28, height: 28))
             let aspect = tex.size().width / tex.size().height
-            let h = maxHeight
+            let h: CGFloat = set == .bichon ? maxHeight * 1.2 : maxHeight
             let w = h * aspect
             return CGSize(width: w, height: h)
         }
@@ -244,19 +244,17 @@ final class MascotNode: SKSpriteNode {
                 lidColor: NSColor(white: 0.15, alpha: 1.0)
             )
         case .bichon:
-            // bichonImage 눈 위치: (8,18) + (17,18), 크기 3x3, 캔버스 28x28
-            // SpriteKit 좌표: 중심 기준, y 반전 없음 (flipped: false)
+            // bichonImage 눈 위치: (8,18) + (17,18), 크기 3x1, 캔버스 28x28
             let w = self.size.width
             let h = self.size.height
-            // 눈 중심: 좌 (9.5/28, 19.5/28), 우 (18.5/28, 19.5/28) → 중심 기준 오프셋
             let leftX = (9.5 / 28.0 - 0.5) * w
             let rightX = (18.5 / 28.0 - 0.5) * w
-            let eyeY = (19.5 / 28.0 - 0.5) * h
+            let eyeY = (18.5 / 28.0 - 0.5) * h
             return EyeConfig(
                 leftPos: CGPoint(x: leftX, y: eyeY),
                 rightPos: CGPoint(x: rightX, y: eyeY),
-                eyeSize: CGSize(width: w * 4.0 / 28.0, height: h * 4.0 / 28.0),
-                lidColor: NSColor(white: 0.92, alpha: 1.0)  // 털 음영색으로 자연스럽게
+                eyeSize: CGSize(width: w * 4.0 / 28.0, height: h * 2.0 / 28.0),
+                lidColor: NSColor(white: 1.0, alpha: 1.0)
             )
         }
     }
