@@ -71,8 +71,7 @@ final class MascotScene: SKScene {
 
     /// 마스코트 셋을 변경한다.
     func changeMascotSet(_ set: MascotSet) {
-        // 기존 마스코트 위치/상태 백업
-        let pos = mascotNode.position
+        // 기존 마스코트 상태 백업
         let state = mascotNode.currentState
 
         // 기존 노드 완전 제거
@@ -86,7 +85,7 @@ final class MascotScene: SKScene {
 
         // 새 MascotNode를 UserDefaults 기반으로 생성 (= 앱 시작과 동일)
         let newNode = MascotNode()
-        newNode.position = pos
+        newNode.position = normalMascotPosition  // 드리프트된 위치가 아닌 기준점 사용
         newNode.zPosition = 10
         addChild(newNode)
         mascotNode = newNode
@@ -100,6 +99,8 @@ final class MascotScene: SKScene {
 
     /// 마스코트 상태를 변경한다.
     func updateMascotState(_ state: MascotState) {
+        // 상태 전환 시 드리프트 방지: Y 위치를 기준점으로 리셋
+        mascotNode.position = normalMascotPosition
         mascotNode.forceSetState(state)
         statusLabel?.text = state.displayName
 
@@ -184,6 +185,7 @@ final class MascotScene: SKScene {
         removeNeedsEmitter()
         removePlayingEmitter()
 
+        mascotNode.position = normalMascotPosition
         mascotNode.alpha = 0
         mascotNode.zRotation = 0
         mascotNode.xScale = 1.0
