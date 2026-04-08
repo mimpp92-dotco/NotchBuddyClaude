@@ -27,6 +27,7 @@ final class NotchWindow {
     private let skView: SKView
     private let mascotScene: MascotScene
     private(set) var placementMode: PlacementMode = .notch
+    private var mouseMonitor: Any?
 
     /// 마스코트 클릭 시 팝오버를 열도록 AppDelegate에서 설정
     var onPopoverRequested: (() -> Void)?
@@ -50,7 +51,7 @@ final class NotchWindow {
         panel.level = .statusBar
         panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
         panel.hasShadow = false
-        panel.ignoresMouseEvents = false
+        panel.ignoresMouseEvents = true  // 기본: 클릭 통과 (마스코트 근처에서만 활성화)
         panel.isMovableByWindowBackground = false
         panel.hidesOnDeactivate = false
 
@@ -73,15 +74,26 @@ final class NotchWindow {
         // 조립
         skView.presentScene(mascotScene)
 
-        let container = NSView(frame: NSRect(origin: .zero, size: frame.size))
+        let container = PassthroughContainerView(frame: NSRect(origin: .zero, size: frame.size))
         container.autoresizingMask = [.width, .height]
         container.addSubview(skView)
+        container.isMascotHit = { [weak self] point in
+            guard let self else { return false }
+            let viewPoint = self.skView.convert(point, from: container)
+            let scenePoint = self.skView.convert(viewPoint, to: self.mascotScene)
+            return self.mascotScene.isMascotHit(at: scenePoint)
+        }
         panel.contentView = container
 
         // 호버/클릭/드래그 감지용 투명 뷰를 SKView 위에 올림
         let interactionView = NotchInteractionView(frame: NSRect(origin: .zero, size: frame.size))
         interactionView.autoresizingMask = [.width, .height]
 
+        interactionView.isMascotHit = { [weak self] viewPoint in
+            guard let self else { return false }
+            let scenePoint = self.skView.convert(viewPoint, to: self.mascotScene)
+            return self.mascotScene.isMascotHit(at: scenePoint)
+        }
         interactionView.onClickedAt = { [weak self] viewPoint in
             self?.handleClick(at: viewPoint)
         }
@@ -108,10 +120,46 @@ final class NotchWindow {
 
     func show() {
         panel.orderFrontRegardless()
+        startMouseMonitor()
     }
 
     func hide() {
+        stopMouseMonitor()
         panel.orderOut(nil)
+    }
+
+    private func startMouseMonitor() {
+        guard mouseMonitor == nil else { return }
+        mouseMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved, .leftMouseDown, .leftMouseUp]) { [weak self] _ in
+            self?.updateIgnoresMouseEvents()
+        }
+        // 로컬 이벤트도 모니터링 (패널이 활성화된 동안)
+        // mouseMoved는 로컬 모니터로도 잡아야 마스코트 위에서의 움직임 감지
+    }
+
+    private func stopMouseMonitor() {
+        if let monitor = mouseMonitor {
+            NSEvent.removeMonitor(monitor)
+            mouseMonitor = nil
+        }
+    }
+
+    private func updateIgnoresMouseEvents() {
+        let mouseScreen = NSEvent.mouseLocation
+        let panelFrame = panel.frame
+        // 마우스가 패널 영역 밖이면 무시
+        guard panelFrame.contains(mouseScreen) else {
+            if !panel.ignoresMouseEvents { panel.ignoresMouseEvents = true }
+            return
+        }
+        // 패널 내 좌표로 변환 → 씬 좌표로 변환 → 마스코트 히트 체크
+        let panelPoint = NSPoint(x: mouseScreen.x - panelFrame.origin.x,
+                                  y: mouseScreen.y - panelFrame.origin.y)
+        let scenePoint = skView.convert(panelPoint, to: mascotScene)
+        let nearMascot = mascotScene.isMascotHit(at: scenePoint, radius: 35)
+        if panel.ignoresMouseEvents == nearMascot {
+            panel.ignoresMouseEvents = !nearMascot
+        }
     }
 
     func updateState(_ state: MascotState) {
@@ -321,11 +369,23 @@ private final class NotchInteractionView: NSView {
     var onDragMoved: ((NSPoint) -> Void)?
     var onDragEnded: ((NSPoint) -> Void)?
 
+    /// 클릭 위치가 마스코트 근처인지 판정하는 콜백 (nil이면 항상 히트)
+    var isMascotHit: ((CGPoint) -> Bool)?
+
     private var interactionState: InteractionState = .idle
     private var longPressTimer: Timer?
     private var mouseDownPoint: NSPoint = .zero
 
     private var trackingArea: NSTrackingArea?
+
+    /// 마스코트 근처가 아니면 클릭을 통과시켜 메뉴바 등 뒤 요소가 반응하도록 한다.
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        if let check = isMascotHit {
+            let local = convert(point, from: superview)
+            if !check(local) { return nil }
+        }
+        return super.hitTest(point)
+    }
 
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
@@ -418,5 +478,19 @@ private final class NotchInteractionView: NSView {
 
     override func rightMouseDown(with event: NSEvent) {
         // 우클릭 비활성화 (팝오버로 통합됨)
+    }
+}
+
+// MARK: - PassthroughContainerView
+
+/// 마스코트 영역 외의 클릭을 뒤 윈도우(메뉴바 등)로 통과시키는 컨테이너 뷰.
+private final class PassthroughContainerView: NSView {
+    var isMascotHit: ((CGPoint) -> Bool)?
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        if let check = isMascotHit, !check(point) {
+            return nil
+        }
+        return super.hitTest(point)
     }
 }
