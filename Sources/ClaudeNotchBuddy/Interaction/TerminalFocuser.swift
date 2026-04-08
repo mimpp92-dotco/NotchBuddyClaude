@@ -13,6 +13,7 @@ enum TerminalFocuser {
         "dev.zed.Zed",
         "com.jetbrains.intellij",
         "com.anthropic.claudefordesktop",  // Claude Desktop
+        "com.cmuxterm.app",                // cmux
     ]
 
     /// TerminalApp으로 포커스한다.

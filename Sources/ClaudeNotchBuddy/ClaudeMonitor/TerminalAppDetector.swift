@@ -11,6 +11,7 @@ enum TerminalApp: String, Sendable {
     case ghostty        = "com.mitchellh.ghostty"
     case zed            = "dev.zed.Zed"
     case claudeDesktop  = "com.anthropic.claudefordesktop"
+    case cmux           = "com.cmuxterm.app"
     case tmux           = "tmux"
     case unknown        = "unknown"
 
@@ -33,6 +34,7 @@ enum TerminalApp: String, Sendable {
         case .ghostty:       return "Ghostty"
         case .zed:           return "Zed"
         case .claudeDesktop: return "Claude"
+        case .cmux:          return "cmux"
         case .tmux:          return "tmux"
         case .unknown:       return "Terminal"
         }
@@ -41,7 +43,7 @@ enum TerminalApp: String, Sendable {
     /// SF Symbol 폴백 아이콘.
     var systemIconName: String {
         switch self {
-        case .terminal, .iterm2, .warp, .ghostty: return "terminal"
+        case .terminal, .iterm2, .warp, .ghostty, .cmux: return "terminal"
         case .vscode, .cursor, .zed:              return "chevron.left.forwardslash.chevron.right"
         case .claudeDesktop:                      return "brain"
         case .tmux:                               return "rectangle.split.2x1"
@@ -61,6 +63,7 @@ enum TerminalApp: String, Sendable {
         ("Zed.app",                  .zed),
         ("Claude.app",               .claudeDesktop),
         ("Application Support/Claude/claude-code", .claudeDesktop),
+        ("cmux.app",                 .cmux),
     ]
 
     /// 프로세스 경로에서 앱을 판별한다.
