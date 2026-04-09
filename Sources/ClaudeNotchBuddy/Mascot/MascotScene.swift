@@ -99,8 +99,10 @@ final class MascotScene: SKScene {
 
     /// 마스코트 상태를 변경한다.
     func updateMascotState(_ state: MascotState) {
-        // 상태 전환 시 드리프트 방지: Y 위치를 기준점으로 리셋
-        mascotNode.position = normalMascotPosition
+        // 상태 전환 시 드리프트 방지: 노치 모드에서만 Y 위치를 기준점으로 리셋
+        if !isDesktopMode {
+            mascotNode.position = normalMascotPosition
+        }
         mascotNode.forceSetState(state)
         statusLabel?.text = state.displayName
 

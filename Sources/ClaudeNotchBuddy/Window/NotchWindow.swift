@@ -214,7 +214,8 @@ final class NotchWindow {
         mascotScene.hideForTransition()
         if placementMode.isNotch {
             let sizeScale = MascotSize.saved.scale
-            let mascotPt = MascotNode.defaultSize * sizeScale
+            let actualSize = MascotNode.displaySize(for: MascotSet.saved)
+            let mascotPt = max(actualSize.width, actualSize.height) * sizeScale
             let bubbleRoom: CGFloat = 120 + 40 * sizeScale
             let portableSize = CGSize(
                 width: mascotPt + 40 + bubbleRoom * 2,
@@ -229,6 +230,7 @@ final class NotchWindow {
             panel.setFrame(portableFrame, display: true)
             skView.frame = NSRect(origin: .zero, size: portableSize)
             mascotScene.size = portableSize
+            mascotScene.isDesktopMode = true  // 드래그 중에는 데스크탑 레이아웃 사용
             mascotScene.updateDesktopLayout()
         }
 
@@ -298,7 +300,8 @@ final class NotchWindow {
         // 노치에서 나올 때 현재 크기(S) 유지. 사용자가 설정에서 변경 가능.
 
         let sizeScale = mascotScene.currentMascotSize.scale
-        let mascotPt = MascotNode.defaultSize * sizeScale
+        let actualSize = MascotNode.displaySize(for: MascotSet.saved)
+        let mascotPt = max(actualSize.width, actualSize.height) * sizeScale
         let padding: CGFloat = 20
         let topRoom: CGFloat = 16  // 바운스/점프 시 머리 짤림 방지
         let bubbleRoom: CGFloat = 120 + 40 * sizeScale
